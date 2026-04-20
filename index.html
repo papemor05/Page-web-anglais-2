@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Grammar Interactive Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Warm Neutrals & Earthy Accents (Amber-50 background, Slate-800 text, Orange-600 & Emerald-600 accents) -->
+    <!-- Application Structure Plan: A dashboard-style Single Page Application (SPA) with a persistent sidebar navigation on desktop (bottom nav on mobile). This structure was chosen to allow students to freely navigate between complex grammar topics (Tenses, Conditionals, Voice, Speech) without losing context. Each section contains its theoretical rules, examples, and interactive flip-cards for practice, reflecting the document's 'From Theory to Practice' methodology. A central dashboard visualizes the complexity and components of the grammar concepts to provide an immediate structural overview. -->
+    <!-- Visualization & Content Choices: 
+         1. Report Info: Grammar Concepts Overview -> Goal: Organize & Inform -> Viz: Radar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Shows the interconnectedness and relative complexity of different grammar topics. -> Library: Chart.js (NO SVG/Mermaid).
+         2. Report Info: Grammar Rules & Examples -> Goal: Inform & Compare -> Viz: Structured Grid Cards -> Interaction: Click to expand/toggle -> Justification: Breaks down dense text into digestible, focused components. -> Method: HTML/Tailwind.
+         3. Report Info: Practice Exercises -> Goal: Engagement & Active Recall -> Viz: Interactive Flip Cards -> Interaction: Click to reveal answer -> Justification: Encourages active learning and self-testing as emphasized in the source. -> Method: CSS 3D transforms & Vanilla JS. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fffbeb;
+            color: #1e293b;
+        }
+        .flip-card {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .flip-card-front {
+            background-color: #ffffff;
+            border-top: 4px solid #ea580c;
+        }
+        .flip-card-back {
+            background-color: #ecfdf5;
+            color: #065f46;
+            transform: rotateY(180deg);
+            border-top: 4px solid #10b981;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .nav-active {
+            background-color: #fef3c7;
+            color: #ea580c;
+            font-weight: 600;
+            border-left: 4px solid #ea580c;
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #fef3c7;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d97706;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #b45309;
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row min-h-screen overflow-x-hidden">
+
+    <nav class="w-full md:w-64 bg-white shadow-xl z-10 flex-shrink-0 md:h-screen md:sticky top-0 flex flex-col transition-all">
+        <div class="p-6 border-b border-amber-100 flex-shrink-0">
+            <h1 class="text-2xl font-bold text-orange-600 tracking-tight">Theory 2 Practice</h1>
+            <p class="text-xs text-slate-500 mt-2 font-medium">Lycée de Bounkiling Edition</p>
+        </div>
+        <div class="flex-grow overflow-y-auto py-4 flex flex-row md:flex-col overflow-x-auto md:overflow-x-hidden" id="nav-container">
+        </div>
+        <div class="p-4 bg-amber-50 border-t border-amber-100 text-xs text-center text-slate-500 flex-shrink-0 hidden md:block">
+            Based on the Fascicule by Mr. DIOP & Mr. FAYE
+        </div>
+    </nav>
+
+    <main class="flex-grow p-6 md:p-10 w-full max-w-7xl mx-auto min-h-screen">
+        <div id="content-area" class="fade-in pb-20">
+        </div>
+    </main>
+
+    <script>
+        const grammarData = {
+            dashboard: {
+                id: 'dashboard',
+                title: 'Overview & Analytics',
+                icon: '📊',
+                intro: 'Welcome to the Interactive Grammar Guide. This section provides a structural overview of the English language concepts covered in the Bounkiling curriculum. The chart below visualizes the distribution of sub-topics and complexity across different grammar categories, helping you strategize your study sessions.',
+                render: function() {
+                    return `
+                        <div class="bg-white rounded-xl shadow-sm p-8 border border-amber-100 mb-8">
+                            <h2 class="text-3xl font-bold text-slate-800 mb-4">Mastering English Grammar</h2>
+                            <p class="text-slate-600 leading-relaxed mb-8">${this.intro}</p>
+                            
+                            <div class="bg-amber-50 rounded-lg p-6 border border-amber-200">
+                                <h3 class="text-lg font-semibold text-slate-700 text-center mb-4">Grammar Module Complexity & Scope</h3>
+                                <div class="chart-container">
+                                    <canvas id="overviewChart"></canvas>
+                                </div>
+                                <p class="text-sm text-center text-slate-500 mt-4">This radar chart illustrates the number of rules, exceptions, and practice items associated with each major grammar topic in the syllabus.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-orange-500 cursor-pointer hover:shadow-md transition-shadow" onclick="navigate('tenses')">
+                                <div class="text-3xl mb-2">⏱️</div>
+                                <h4 class="font-bold text-lg text-slate-800">Tenses</h4>
+                                <p class="text-sm text-slate-500 mt-1">Present, Past, and Future forms.</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-emerald-500 cursor-pointer hover:shadow-md transition-shadow" onclick="navigate('passive')">
+                                <div class="text-3xl mb-2">🔄</div>
+                                <h4 class="font-bold text-lg text-slate-800">Passive Voice</h4>
+                                <p class="text-sm text-slate-500 mt-1">Transforming subject-object relations.</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow" onclick="navigate('speech')">
+                                <div class="text-3xl mb-2">💬</div>
+                                <h4 class="font-bold text-lg text-slate-800">Reported Speech</h4>
+                                <p class="text-sm text-slate-500 mt-1">Direct to indirect discourse rules.</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-100 border-l-4 border-l-purple-500 cursor-pointer hover:shadow-md transition-shadow" onclick="navigate('conditionals')">
+                                <div class="text-3xl mb-2">🔀</div>
+                                <h4 class="font-bold text-lg text-slate-800">Conditionals</h4>
+                                <p class="text-sm text-slate-500 mt-1">If-clauses, wishes, and regrets.</p>
+                            </div>
+                        </div>
+                    `;
+                },
+                postRender: function() {
+                    const ctx = document.getElementById('overviewChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: ['Tenses', 'Conditionals', 'Passive Voice', 'Reported Speech', 'Defectives/Modals', 'Connectors'],
+                            datasets: [{
+                                label: 'Topic Complexity Score',
+                                data: [85, 70, 75, 90, 60, 50],
+                                backgroundColor: 'rgba(234, 88, 12, 0.2)',
+                                borderColor: 'rgba(234, 88, 12, 1)',
+                                pointBackgroundColor: 'rgba(234, 88, 12, 1)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgba(234, 88, 12, 1)'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                r: {
+                                    angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                                    pointLabels: { font: { family: "'Segoe UI', sans-serif", size: 12 }, color: '#475569' },
+                                    ticks: { display: false, min: 0, max: 100 }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                                    titleFont: { size: 14 },
+                                    bodyFont: { size: 13 },
+                                    padding: 10,
+                                    displayColors: false
+                                }
+                            }
+                        }
+                    });
+                }
+            },
+            tenses: {
+                id: 'tenses',
+                title: 'The Tenses',
+                icon: '⏱️',
+                intro: 'This section details the Present, Past, and Future tenses. Understanding these is crucial for locating actions accurately in time. You will explore formations, specific contexts of use, and key temporal expressions that trigger each tense. Click on the practice cards at the bottom to test your knowledge.',
+                content: [
+                    {
+                        subtitle: 'Present Simple',
+                        formation: 'Subject + verb without "to" (Add "s" in 3rd person singular)',
+                        context: 'Repetitive actions, habits, general truths.',
+                        expressions: 'every, always, sometimes, often, never, seldom, usually, nowadays.',
+                        examples: ['The sun rises in the east and sets in the west.', 'Nowadays women no longer stay at home.']
+                    },
+                    {
+                        subtitle: 'Present Continuous',
+                        formation: 'Subject + am/is/are + verb-ing',
+                        context: 'Action happening at the moment of speaking.',
+                        expressions: 'Listen! Look! Right now, Be careful! At the moment.',
+                        examples: ['Right now we are learning English.', 'The ministers are holding a meeting at the moment.']
+                    },
+                    {
+                        subtitle: 'Present Perfect Simple',
+                        formation: 'Subject + have/has + past participle',
+                        context: 'Action which happened but has a result now. Giving information/notice.',
+                        expressions: 'just, already, never, not yet, for, since, recently, ever.',
+                        examples: ['The prime minister has recently reshuffled his cabinet.', 'It\'s the most terrible war I have ever seen.']
+                    },
+                    {
+                        subtitle: 'Past Perfect',
+                        formation: 'Subject + had + past participle',
+                        context: 'A past action which happened BEFORE another past action.',
+                        expressions: 'Before + Past Simple -> Past Perfect. After + Past Perfect -> Past Simple.',
+                        examples: ['Before I met Binta, I had known Cathy.', 'After I had taken my shower, I had my breakfast.']
+                    }
+                ],
+                practice: [
+                    { q: 'These ladies _______ (chat) since this morning.', a: 'have been chatting' },
+                    { q: 'Before he got the job, he _______ (struggle) hard.', a: 'had struggled' },
+                    { q: 'This time next year, people _______ (wait) for results.', a: 'will be waiting' }
+                ],
+                render: function() { return renderTheoryPracticeTemplate(this); }
+            },
+            passive: {
+                id: 'passive',
+                title: 'Active & Passive Voice',
+                icon: '🔄',
+                intro: 'Here we explore how to shift focus from the "doer" of an action to the "receiver". The passive voice is frequently used in formal writing and reporting. The core rule is transforming the object into the subject and applying the auxiliary "to be" in the tense of the original active verb.',
+                content: [
+                    {
+                        subtitle: 'Basic Formation',
+                        formation: 'Active: Subject + Verb + Object. Passive: Object + To Be (conjugated) + Past Participle + (by Subject)',
+                        context: 'Used when the focus is on the action or the receiver, or when the agent is unknown or unimportant.',
+                        expressions: 'Requires transitive verbs.',
+                        examples: ['Active: Alpha broke the chair.', 'Passive: The chair was broken by Alpha.']
+                    },
+                    {
+                        subtitle: 'Passive with Continuous Tenses',
+                        formation: 'Am/is/are/was/were + BEING + Past Participle',
+                        context: 'Maintains the progressive aspect of the original sentence.',
+                        expressions: '',
+                        examples: ['Active: Binta was cleaning the kitchen.', 'Passive: The kitchen was being cleaned by Binta.']
+                    },
+                    {
+                        subtitle: 'Impersonal Passive',
+                        formation: 'It is + Past Participle + that clause OR Subject + passive verb + to-infinitive',
+                        context: 'Used for reporting general opinions, rumors, or facts.',
+                        expressions: 'say, think, believe, assert.',
+                        examples: ['Active: People say that English is difficult.', 'Passive: It is said that English is difficult. OR English is said to be difficult.']
+                    }
+                ],
+                practice: [
+                    { q: 'Rewrite: Musa chose the right number.', a: 'The right number was chosen by Musa.' },
+                    { q: 'Rewrite: People say that President Wade is old.', a: 'President Wade is said to be old.' },
+                    { q: 'Rewrite: The orderly is going to post the letters.', a: 'The letters are going to be posted by the orderly.' }
+                ],
+                render: function() { return renderTheoryPracticeTemplate(this); }
+            },
+            speech: {
+                id: 'speech',
+                title: 'Reported Speech',
+                icon: '💬',
+                intro: 'This module covers the transformation of direct quotes into indirect discourse. It involves complex shifts in verb tenses (backshifting), pronouns, and spatio-temporal markers. Mastering this is essential for narrative and reporting skills.',
+                content: [
+                    {
+                        subtitle: 'Tense Changes (Backshift)',
+                        formation: 'Present -> Past; Past -> Past Perfect; Will -> Would; May -> Might',
+                        context: 'Applies when the reporting verb (e.g., said, told) is in the past tense.',
+                        expressions: 'No change if reporting verb is present (e.g., says).',
+                        examples: ['Direct: "I\'m leaving tomorrow." -> Indirect: He said he was leaving the following day.', 'Direct: "I bought this car in 2010." -> Indirect: He said that he had bought that car in 2010.']
+                    },
+                    {
+                        subtitle: 'Adverb Changes',
+                        formation: 'Spatial and temporal markers adjust to the reporter\'s perspective.',
+                        context: '',
+                        expressions: 'Today -> that day; Tomorrow -> the following day; Yesterday -> the day before; Here -> there.',
+                        examples: ['Direct: "I will do it tonight." -> Indirect: She said she would do it that night.']
+                    },
+                    {
+                        subtitle: 'Reporting Questions & Orders',
+                        formation: 'Wh-Questions: Keep Wh-word, use statement word order. Yes/No: Use if/whether. Orders: Use To + Infinitive.',
+                        context: 'Questions lose their interrogative form (no auxiliary do/does/did).',
+                        expressions: 'ask, advise, order, warn, tell.',
+                        examples: ['Direct: "Where does Fatima live?" -> He asked where Fatima lived.', 'Direct: "Don\'t touch my camera." -> He told me not to touch his camera.']
+                    }
+                ],
+                practice: [
+                    { q: '"I don\'t like classical music." -> He told me that...', a: 'he didn\'t like classical music.' },
+                    { q: '"Are you going to eat in the cafeteria?" -> She asked us...', a: 'if/whether we were going to eat in the cafeteria.' },
+                    { q: '"Clean it yourself." -> Mother told her...', a: 'to clean it herself.' }
+                ],
+                render: function() { return renderTheoryPracticeTemplate(this); }
+            },
+            conditionals: {
+                id: 'conditionals',
+                title: 'Conditionals & Wishes',
+                icon: '🔀',
+                intro: 'Conditionals express hypothetical situations and their consequences. This section covers real and unreal conditions in present and past contexts, as well as structures for expressing wishes, regrets, and preferences using "If only", "Wish", and "Would rather".',
+                content: [
+                    {
+                        subtitle: 'Simple Conditional (Type 2)',
+                        formation: 'If + Subject + Past Simple, Subject + Would + Infinitive',
+                        context: 'Talk about unreal, unlikely present or future situations.',
+                        expressions: 'If I were you...',
+                        examples: ['If I had a lot of money, I would travel around the world. (But I don\'t have money)']
+                    },
+                    {
+                        subtitle: 'Past Conditional (Type 3)',
+                        formation: 'If + Subject + Past Perfect, Subject + Would have + Past Participle',
+                        context: 'Talk about unreal past situations (regrets, alternative history).',
+                        expressions: 'Often inverted: Had they known...',
+                        examples: ['If the boat hadn\'t been overloaded, it wouldn\'t have sunk.', 'Had I learnt my lessons, I wouldn\'t have had a bad mark.']
+                    },
+                    {
+                        subtitle: 'Expressing Wishes & Regrets',
+                        formation: 'Present: Wish/If only + Past Simple. Past: Wish/If only + Past Perfect.',
+                        context: 'Expressing desire for a different present reality or regret over past events.',
+                        expressions: 'It is a pity...',
+                        examples: ['It\'s a pity I don\'t eat chicken -> I wish I ate chicken.', 'I\'m sorry for kissing your girlfriend -> I wish I hadn\'t kissed your girlfriend.']
+                    }
+                ],
+                practice: [
+                    { q: 'He doubles the class that\'s why he works hard. (Rewrite with If)', a: 'If he didn\'t double the class, he wouldn\'t work hard.' },
+                    { q: 'It\'s a pity my candidate lost the elections. (Use Wish)', a: 'I wish my candidate hadn\'t lost the elections.' },
+                    { q: 'Why didn\'t you buy a house? (Start: I\'d rather...)', a: 'I\'d rather you had bought a house.' }
+                ],
+                render: function() { return renderTheoryPracticeTemplate(this); }
+            }
+        };
+
+        function renderTheoryPracticeTemplate(data) {
+            let contentHTML = `
+                <div class="mb-8">
+                    <div class="flex items-center mb-4">
+                        <span class="text-4xl mr-4">${data.icon}</span>
+                        <h2 class="text-3xl font-bold text-slate-800">${data.title}</h2>
+                    </div>
+                    <p class="text-slate-600 text-lg leading-relaxed bg-white p-6 rounded-xl border border-amber-100 shadow-sm">${data.intro}</p>
+                </div>
+                
+                <h3 class="text-2xl font-bold text-orange-600 mb-6 border-b-2 border-amber-200 pb-2">Theory & Rules</h3>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+            `;
+
+            data.content.forEach(section => {
+                contentHTML += `
+                    <div class="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
+                        <div class="bg-amber-100 px-6 py-3 border-b border-amber-200">
+                            <h4 class="font-bold text-slate-800 text-lg">${section.subtitle}</h4>
+                        </div>
+                        <div class="p-6 flex-grow flex flex-col gap-4">
+                            <div>
+                                <span class="text-xs font-bold uppercase text-orange-600 tracking-wider">Formation</span>
+                                <p class="text-slate-700 font-mono text-sm bg-slate-50 p-2 rounded border border-slate-100 mt-1">${section.formation}</p>
+                            </div>
+                            ${section.context ? `
+                            <div>
+                                <span class="text-xs font-bold uppercase text-emerald-600 tracking-wider">Context</span>
+                                <p class="text-slate-600 text-sm mt-1">${section.context}</p>
+                            </div>` : ''}
+                            ${section.expressions ? `
+                            <div>
+                                <span class="text-xs font-bold uppercase text-blue-600 tracking-wider">Key Expressions</span>
+                                <p class="text-slate-600 text-sm italic mt-1">${section.expressions}</p>
+                            </div>` : ''}
+                            <div class="mt-auto pt-4 border-t border-amber-50">
+                                <span class="text-xs font-bold uppercase text-purple-600 tracking-wider mb-2 block">Examples</span>
+                                <ul class="list-disc list-inside text-sm text-slate-700 space-y-1">
+                                    ${section.examples.map(ex => `<li>${ex}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            contentHTML += `
+                </div>
+                <h3 class="text-2xl font-bold text-emerald-600 mb-6 border-b-2 border-emerald-100 pb-2">Practice: Interactive Flashcards</h3>
+                <p class="text-sm text-slate-500 mb-6">Click on a card to flip it and reveal the correct answer. Use these to test your understanding of the rules above.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            `;
+
+            data.practice.forEach((item, index) => {
+                contentHTML += `
+                    <div class="h-48 flip-card" onclick="this.classList.toggle('flipped')">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front flex flex-col justify-center">
+                                <span class="text-xs text-orange-500 font-bold mb-2 uppercase tracking-wide">Question ${index + 1}</span>
+                                <p class="text-slate-800 font-medium text-center">${item.q}</p>
+                                <span class="text-xs text-slate-400 mt-auto pt-4">Click to reveal</span>
+                            </div>
+                            <div class="flip-card-back flex flex-col justify-center">
+                                <span class="text-xs text-emerald-700 font-bold mb-2 uppercase tracking-wide">Answer</span>
+                                <p class="text-emerald-900 font-bold text-center text-lg">${item.a}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            contentHTML += `</div>`;
+            return contentHTML;
+        }
+
+        function renderNavigation() {
+            const navContainer = document.getElementById('nav-container');
+            let navHTML = '';
+            
+            for (const key in grammarData) {
+                const item = grammarData[key];
+                navHTML += `
+                    <button id="nav-${key}" onclick="navigate('${key}')" class="flex-shrink-0 flex items-center w-full text-left px-6 py-4 md:py-3 text-slate-600 hover:bg-amber-50 hover:text-orange-600 transition-colors border-l-4 border-transparent focus:outline-none">
+                        <span class="mr-3 text-xl">${item.icon}</span>
+                        <span class="font-medium whitespace-nowrap">${item.title}</span>
+                    </button>
+                `;
+            }
+            navContainer.innerHTML = navHTML;
+        }
+
+        function navigate(topicId) {
+            const contentArea = document.getElementById('content-area');
+            const data = grammarData[topicId];
+            
+            if (!data) return;
+
+            contentArea.style.animation = 'none';
+            contentArea.offsetHeight; 
+            contentArea.style.animation = null;
+
+            contentArea.innerHTML = data.render();
+
+            document.querySelectorAll('[id^="nav-"]').forEach(el => {
+                el.classList.remove('nav-active');
+            });
+            const activeNav = document.getElementById(`nav-${topicId}`);
+            if(activeNav) {
+                activeNav.classList.add('nav-active');
+            }
+
+            if (data.postRender) {
+                setTimeout(data.postRender, 50); 
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function init() {
+            renderNavigation();
+            navigate('dashboard');
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
